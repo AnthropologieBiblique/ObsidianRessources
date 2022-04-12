@@ -14,7 +14,7 @@ let bookText = String(await app.vault.read(book));
 
 let verseInit = (await tp.system.suggester((item) => item[1]+" "+item[2]+" ...", [...bookText.matchAll(regexVerse)],false,"🎬 Choisir le verset de début"))[1];
 
-let verseEnd = (await tp.system.suggester((item) => item[1]+" "+item[2]+" ...", [...bookText.matchAll(regexVerse)].filter(item => Number(item[1])>=Number(verseInit)),false,"🏁 Choisir le verset de fin"))[1];
+let verseEnd = (await tp.system.suggester((item) => item[1]+" "+item[2]+" ...", [...bookText.matchAll(regexVerse)].filter(item => Number(item[1].replace(/[a-zA-Z]/,''))>=Number(verseInit.replace(/[a-zA-Z]/,''))),false,"🏁 Choisir le verset de fin"))[1];
 
 let visible = (await tp.system.suggester(["✏️ Référence texte","👁 Encart visible"],[false, true],false,"Référence texte ou encart visible ?"));
 
@@ -24,24 +24,39 @@ if (!visible){
 	var style = "standard";
 }
 
-if (style == "standard"){
+var bibleStandard = new RegExp(`/AELF/`);
+
+if (style == "standard" && bibleStandard.test(book.path)) {
+	var bookName = book.basename;
+} else if (style == "standard") {
 	var bookName = book.basename.replace(/^[^\ ]+\ /g,'');
 } else {
 	var bookName = [...bookText.matchAll(/aliases : [\r?\n]-\ (.+)/g)][0][1];
 }
 
-if (visible){
-	bang = '!';
-} else {
-	bang = '';
-}
-
 if (verseInit == undefined || verseInit == null) {
 	return;
-} else if (verseInit == verseEnd) {
-	return bang+"[["+book.basename+"#"+verseInit+"|"+bookName+","+verseInit+"]] ";
+} else if (verseInit == verseEnd && !visible) {
+	return "[["+book.basename+"#"+verseInit+"|"+bookName+","+verseInit+"]] ";
+} else if (!visible){
+	return "[["+book.basename+"#"+verseInit+"|"+bookName+","+verseInit+"]]"+"[["+book.basename+"#"+verseEnd+"|"+"-"+verseEnd+"]] ";
+} else if (verseInit == verseEnd && visible) {
+	return "![["+book.basename+"#"+verseInit+"|"+bookName+","+verseInit+"]] ";
 } else {
-	return bang+"[["+book.basename+"#"+verseInit+"|"+bookName+","+verseInit+"]]"+bang+"[["+book.basename+"#"+verseEnd+"|"+"-"+verseEnd+"]] ";
+	var flag=false;
+	var quote = "";
+	[...bookText.matchAll(regexVerse)].forEach(function(item) {
+		if (!flag && item[1]==verseInit) {
+			flag = true;
+			quote+= "![["+book.basename+"#"+item[1]+"]] ";
+		} else if (flag && item[1] != verseEnd) {
+			quote+= "![["+book.basename+"#"+item[1]+"]] ";
+		} else if (flag && item[1] == verseEnd) {
+			quote+= "![["+book.basename+"#"+item[1]+"]] ";
+			flag = false;
+		}
+	});
+	return quote;
 }
 
 %>
